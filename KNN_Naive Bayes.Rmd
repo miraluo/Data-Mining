@@ -1,0 +1,379 @@
+---
+title: "HW3"
+author: "Mira LUO"
+date: "3/19/2022"
+output: html_document
+---
+
+```{R}
+library('scales')
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(tidyverse)
+songs<-read.csv("/Users/luoyayuan/Desktop/Class Slides/699/assignments/assignment3/top2020_21.csv")
+filter(songs,songs$Song.Name=='Peaches (feat. Daniel Caesar & Giveon)')
+
+#Popularity Danceability Energy Loudness Speechiness Acousticness Liveness Tempo Duration..ms. Valence Chord
+#1         94        0.677  0.696   -6.181       0.119        0.321     0.42 90.03        198082   0.464     C
+
+```
+
+I chose Justin Bieber's song- peaches because this singer is famous and talented, especially this song is extremelly nice. The feeling created by the lyrics and melody is wonderful.
+
+Danceability: 94; 
+Energy: 0.677; 
+key:na;
+loudness:-6.181; 
+Speechiness:0.119; 
+Acousticness:0.321; 
+Liveness:0.42; 
+Valence:0.464; 
+Tempo:90.03; 
+Duration..ms: 198082
+
+
+Question2:
+```{R}
+Peaches<-filter(songs,songs$Song.Name=='Peaches (feat. Daniel Caesar & Giveon)')
+Peaches
+```
+
+
+Question3: read spotify.csv dataset into your environment. Call the str() function on your dataset and show the results.
+```{R}
+spotify<-read.csv("/Users/luoyayuan/Desktop/Class Slides/699/assignments/assignment3/spotify.csv")
+str(spotify)
+spotify$target<-as.factor(spotify$target)
+str(spotify)
+summary(spotify$target)
+```
+
+The type of target is integer.Target variable has unique values of 1 and 0. With 0 records 997 while with 1 records 1020.
+
+
+Question4:Are there any NAs in this dataset? If there are any NA values in any particular column, replace them with the median value for that column.
+```{R}
+anyNA(spotify)
+```
+There is no NAs in this dataset.
+
+
+Question5:Remove these two columns from the dataframe: X and mode. X may appear as X1 (if so, then remove X1 and mode).
+```{R}
+#library(dplyr)
+spotify<-select(spotify,-c(X,mode))
+str(spotify)
+```
+
+
+Question5:Using your assigned seed value (from Assignment 2), partition the spotify dataset into training (60%) and validation (40%) sets.
+```{R}
+set.seed(180)
+train<-sample_frac(spotify,0.6)
+valid<-setdiff(spotify,train)
+
+```
+
+
+Question6:
+```{R}
+train1<-train
+like<-train1%>%filter(train1$target==1)
+dislike<-train1%>%filter(train1$target==0)
+summary(like)
+summary(dislike)
+```
+
+
+```{R}
+#dimension<-c('danceability','energy ','key','loudness','speechiness' ,'acousticness','liveness','valence','tempo','duration_ms')
+#like_value<-c(0.6399,0.6864,5.464,-7.315,0.10709,0.1505388,0.1892,0.5075,122.63,257284)
+#dislike_value<-c(0.5873,0.6726,5.377,-6.827,0.08027,0.2248933,0.18748,0.4698,122.24,233518)
+
+
+meanlike<-colMeans(like[,c('danceability','energy','key','loudness','speechiness','acousticness','liveness','valence','tempo','duration_ms')])
+meandislike<-colMeans(dislike[,c('danceability','energy','key','loudness','speechiness','acousticness','liveness','valence','tempo','duration_ms')])
+difference<-abs((meanlike-meandislike)/((meanlike+meandislike)/2))*100
+difference
+
+#mean_value<-data.frame(dimension,like_value,dislike_value)
+```
+
+```{R}
+train1<-select(train1,-c(4,6,7,10))
+valid1<-select(valid,-c(4,6,7,10))
+```
+If we do not remove variables' values that are very similar for both outcome classes, this variable's feature will be augmented. And it may cause the specific neighbor that has more quantities, leading the predicted value belongs to that neighbor. 
+
+
+
+Question 7:Normalize your data using the preProcess() function from the caret package.
+```{R}
+train.norm<- train1
+valid.norm <- valid1
+spotify.norm <- spotify
+library(caret)
+
+norm.values <- preProcess(train1[,c('artist','song_title','danceability','loudness','speechiness','acousticness','valence','duration_ms')], method=c("center", "scale"))
+
+train.norm[, c('artist','song_title','danceability','loudness','speechiness','acousticness','valence','duration_ms')]<- predict(norm.values, train1[, c('danceability','loudness','speechiness','acousticness','valence','duration_ms')])
+
+valid.norm[, c('artist','song_title','danceability','loudness','speechiness','acousticness','valence','duration_ms')]<-predict(norm.values, valid1[, c('danceability','loudness','speechiness','acousticness','valence','duration_ms')])
+
+spotify.norm[, c('artist','song_title','danceability','loudness','speechiness','acousticness','valence','duration_ms')]<- predict(norm.values, spotify[,c('danceability','loudness','speechiness','acousticness','valence','duration_ms')])
+
+```
+
+
+Question 8: Using the knn() function from the FNN package, and using a k-value of 7, generate a predicted classification for your song -- Will George like it or not? What outcome did the model predict? Also, what were your song’s 7 nearest neighbors? List their titles, artists, and outcome classes. 
+```{R}
+new.df<-data.frame(danceability=94,loudness=-6.181,speechiness=0.119,acousticness=0.321,valence=0.464,duration_ms=198082)
+new.norm<-predict(norm.values,new.df)
+library(FNN)
+knn<-knn(train=train.norm[, c('danceability','loudness','speechiness','acousticness','valence','duration_ms')] ,test=new.df[,c('danceability','loudness','speechiness','acousticness','valence','duration_ms')],cl=train.norm[,9],k=7)
+#row.names(train)[attr(nn,'nn.index')]
+index<-c(attr(knn,'nn.index'))
+neighbors<-select(train1[index,],c(artist,song_title,target))
+as.data.frame(neighbors)
+#View(train.norm)
+```
+George will like it because when k=7, it has 3 songs predicted dislike while 4 songs predicted like.The number of likes 'win'. 
+
+Question 9: use your validation set to help you determine an optimal K-value. 
+```{R}
+accuracy.df<-data.frame(k=seq(1,14,1),accuracy=rep(0,14))
+```
+
+```{R}
+for (i in 1:14){
+  knn.pred<-knn(train.norm[,c('danceability','loudness','speechiness','acousticness','valence','duration_ms')],
+                valid.norm[,c('danceability','loudness','speechiness','acousticness','valence','duration_ms')],
+                cl = train.norm[,9], k= i)
+  knn.pred<-as.factor(knn.pred)
+  trueval<-as.factor(valid.norm[,9])
+  accuracy<-confusionMatrix(knn.pred,trueval)$overall[1]
+  accuracy.df[i,2]<-accuracy
+  }
+  # Error: `data` and `reference` should be factors with the same levels.
+
+accuracy.df
+```
+
+
+
+
+Question 10: use either the base graphics package or ggplot, make a scatterplot with the various k values that you used in the previous step on your x-axis, and the accuracy metrics on the y-axis.
+```{R}
+ggplot(accuracy.df, aes(x=k, y=accuracy)) + geom_point()
+
+```
+
+Question 11:re-run your knn() with the optimal k-value that you found previously.What result did you obtain? 
+```{R}
+knn2 <- knn(train = train.norm[,c('danceability','loudness','speechiness','acousticness','valence','duration_ms')],
+                   test = new.df[,c('danceability','loudness','speechiness','acousticness','valence','duration_ms')],
+                   cl = train.norm[,9], k = 14)
+ 
+index1 <- c(attr(knn2, "nn.index"))
+neighbors1<- select(train1[index1,],c(artist,song_title,target))
+as.data.frame(neighbors1)
+
+
+```
+From the prediction, my highest accuracy lies when k=14.It is different from the result  when I first ran the k-nn function.It adds other 7 songs to my list.
+
+
+Naive Bayes:
+Question1: Bring the file weather_check into your local R environment. This file can be found in the package fivethirtyeight.
+```{R}
+#install.packages('fivethirtyeight')
+library(fivethirtyeight)
+weather<- weather_check
+str(weather)
+```
+
+
+Question2: Exploring the dataset and preparing the variables
+```{R}
+weather$respondent_id<-as.factor(weather$respondent_id)
+weather$ck_weather<-as.factor(weather$ck_weather)
+weather$weather_source<-as.factor(weather$weather_source)
+weather$weather_source_site<-as.factor(weather$weather_source_site)
+weather$ck_weather_watch<-as.factor(weather$ck_weather_watch)
+weather$age<-as.factor(weather$age)
+weather$female<-as.factor(weather$female)
+weather$hhold_income<-as.factor(weather$hhold_income)
+weather$region<-as.factor(weather$region)
+summary(weather)
+
+```
+
+```{R}
+library(forcats)
+fct_count(weather$weather_source)
+weather$weather_source <- (fct_collapse(weather$weather_source,
+                     Web = c("A specific website or app (please provide the answer)","Internet search"),
+                     Radio = c("Radio weather"),
+                     News = c("Local TV News","Newspaper","Newsletter"),
+                     Channel = c("The Weather Channel"),
+                     App = c("The default weather app on your phone")))
+```
+
+
+```{R}
+
+weather1<-subset(weather, select = -c(weather_source_site,respondent_id))
+
+```
+
+```{R}
+
+weather1<-na.omit(weather1)
+summary(weather1$weather_source)
+```
+We reduce the number of distinct levels to make the categories leaner. And if we want to visualize the relationship among these variables, it might be easier to do with fewer categories.
+
+```{R}
+anyNA(weather)
+colSums(is.na(weather))  
+```
+
+
+
+```{R}
+table(weather$weather_source_site)
+```
+Variable weather_source_site has a high degree of missingness and this variable indicates that it is hard for people to track the source site. So except some are successfully be tracked, the rest of them remain unknown. Since it is unknown for us, it is meaningless if we still keep them.We could focus on other related variables.
+
+
+
+Question3: Using your seed value (the same one from Assignment #2) , partition your data into training (60%) and validation (40%) sets.
+```{R}
+set.seed(180)
+train3<-sample_frac(weather1,0.6)
+valid3<-setdiff(weather1,train3)
+```
+
+
+Question4: Preparatory data analysis
+```{R}
+prop.table(table(train3$weather_source, train3$age), margin = 1)
+ggplot(train3, aes(fill= weather_source,x= age )) + geom_bar(position = "fill")
+```
+
+
+```{R}
+prop.table(table(train3$weather_source, train3$ck_weather), margin = 1)
+ggplot(train3, aes(fill= weather_source,x=ck_weather )) + geom_bar(position = "fill")+labs(x='typically check a daily weather report or not')
+```
+
+```{R}
+prop.table(table(train3$weather_source, train3$ck_weather_watch), margin = 1)
+ggplot(train3, aes(fill= weather_source,x=ck_weather_watch)) + geom_bar(position = "fill")+labs(x='Check the weather on a smartwatch')+theme(axis.text.x = element_text(angle = 45))
+
+```
+
+```{R}
+prop.table(table(train3$weather_source, train3$ck_weather), margin = 1)
+ggplot(train3, aes(fill= weather_source,x=ck_weather )) + geom_bar(position = "fill")+labs(x='typically check a daily weather report or not')
+```
+
+```{R}
+prop.table(table(train3$weather_source, train3$female), margin = 1)
+ggplot(train3, aes(fill= weather_source,x=female )) + geom_bar(position = "fill")
+```
+
+```{R}
+prop.table(table(train3$weather_source, train3$hhold_income), margin = 1)
+ggplot(train3, aes(fill= weather_source,x=hhold_income)) + geom_bar(position = "fill")+theme(axis.text.x = element_text(angle = 45))
+```
+
+```{R}
+prop.table(table(train3$weather_source, train3$region), margin = 1)
+ggplot(train3, aes(fill= weather_source,x=region)) + geom_bar(position = "fill")+theme(axis.text.x = element_text(angle = 45))
+```
+I drop variable respondent_id in this model because it is acted as index to make them unique but it does not have actual meaningfulness as a predictor in my modelwhen generating confusionmatrix.
+
+Question5: Build a naive bayes model, with the response variable weather_source
+```{R}
+library(e1071)
+wc<-naiveBayes(weather_source~.,data=train3)
+```
+
+Question6:  Show a confusion matrix that compares the performance of your model against the training data, and another that shows its performance against the validation data (just use the accuracy metric for this analysis). How did your training set’s performance compare with your validation set’s performance?
+```{R}
+pred.wc<-predict(wc,newdata=train3)
+confusionMatrix(pred.wc,train3$weather_source)
+#accuracy:0.43
+```
+```{R}
+pred.wc2<-predict(wc,newdata=valid3)
+confusionMatrix(pred.wc2,valid3$weather_source)
+#accuracy: 0.31
+```
+My training model shows 0.426 accuracy which is larger than my validation model with 0.311 accuracy.
+
+Question7:In classification, what is the naive rule?
+```{R}
+fct_count(train3$weather_source)
+#171+131+15+136+85=538
+#87+65+64+13=229
+#229/538=0.426
+#(47+25+25+4)/538=0.19
+```
+Naive rule and naive bayes are two methods that both returning the accuracy of the naive rule. The results of naive bayes are always higher than the results of naive rule. My training data's naive rule is 0.426 while validation data's naive rule is 0.19.  
+
+
+
+
+```{R}
+pred.prob<-predict(wc,newdata = valid3,type = 'raw')
+df<-data.frame(actual=valid3$weather_source,predict=pred.wc2,pred.prob)
+```
+
+
+Question8:  
+```{R}
+df$Max<-pmax(df$Web,df$News,df$Radio,df$App,df$Channel)
+likely_group<-head(arrange(df,desc(df$Max)),50)
+likely_group
+```
+
+```{R}
+sum(likely_group$actual == likely_group$predict)
+```
+14 of 50 belonged to to that class.
+We can't just use naive rule to just put a data into some most possible class, the accuracy is very low for this method. Second, even the accuracy of naive bayes could only be a little slightly higher than the naive rule.
+
+
+```{R}
+df[ valid3$ck_weather_watch=='Very likely' & valid3$ck_weather=='TRUE' & valid3$age=='18 - 29' & valid3$female=='TRUE',]
+```
+
+Question9: 
+```{R}
+person<-data.frame(ck_weather='TRUE',
+           ck_weather_watch='Very unlikely',
+           age='18 - 29',
+           female=TRUE,
+           hhold_income='$200,000 and up',
+           region='South Atlantic')
+pred.class.person<-predict(wc, person)
+pred.prob.person<-predict(wc, person,type = 'raw')
+pred.class.person;pred.prob.person
+#wc
+```
+
+
+```{R}
+web=0.31784387*0.8070175*0.20467836*0.18713450*0.5672515*0.05847953*0.187134503
+news=0.24349442*0.8091603*0.29007634 *0.05343511*0.6412214*0.06870229*0.137404580 
+radio=0.02788104*0.7333333*0.33333333*0.13333333*0.4666667*0.13333333*0.133333333    
+app=0.25278810*0.7867647*0.17647059*0.33823529*0.6250000*0.06617647* 0.205882353 
+channel=0.15799257*0.8588235*0.27058824*0.20000000*0.5294118*0.04705882*0.176470588 
+sum<-web+news+radio+app+channel
+app/sum
+  
+```
+The probability is 0.46.There is 0.46 possibility that This female is between 18-29 living in South Atlanti with income over $200,000 and she is very likely to check the daily weather report without watch. 

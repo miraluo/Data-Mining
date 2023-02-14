@@ -1,0 +1,349 @@
+---
+title: "Assignment2"
+author: "Mira LUO"
+date: "2/28/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+###Simple linear regression
+##### Question1: Call the library() function on Ecdat.
+```{r}
+library('ggplot2')
+library(tidyverse)
+library(lubridate)
+library(Ecdat)
+```
+
+
+##### Question2: Dataset exploration – missing values.
+##### 2-a:Are there any missing values in this dataset? If so, which columns have missing values? (you might want to reuse a function from Homework 1 to answer this).
+```{r}
+#View(MCAS)
+#?MCAS
+table(is.na(MCAS))
+summary(MCAS)
+```
+####This model has missing values. Column 'spc' has 9, column 'totsc8'  has 40, column 'avgsalary' has 25.
+
+
+
+##### 2-b:How could missing values present a problem in linear regression modeling?
+####Missing data can lead to biased parameter estimates and reduces the representativeness of the sample. Also the absence of data reduces statistical power, which refers to the probability that the test rejects the null hypothesis when it is false. 
+
+
+
+##### 2-c:If there are any NA values in the spc column, replace them with an overall central measure, such as a mean or median.
+```{r}
+table(is.na(MCAS$spc))
+MCAS$spc[is.na(MCAS$spc)]=mean(MCAS$spc,na.rm=TRUE)
+```
+
+
+
+##### 2-d:If there are any NA values in the totsc8 column, replace them by using the impute_lm() function from the simputation package. As input variables for the impute_lm() function, use the two variables from the dataset that are most strongly correlated with totsc8.
+```{r}
+table(is.na(MCAS$totsc8))
+cor(MCAS$totsc8,MCAS[4:17],use='complete.obs')
+# most strongly correlated with totsc8 are totsc4 and percap
+#install.packages('simputation')
+library('simputation')
+```
+
+```{r}
+mcas<-impute_lm(MCAS,totsc8~totsc4+percap)
+```
+
+
+##### 2-e:If there are any NA values in the avgsalary column, replace them by using the impute_lm() function from the simputation package. As input variables for the impute_lm() function, use the two variables from the dataset that are most strongly correlated with avgsalary.
+```{r}
+table(is.na(mcas$avgsalary))
+cor(mcas$avgsalary,mcas[4:17],use='complete.obs')
+# most strongly correlated with avgsalary are regday and percap
+```
+
+```{r}
+mcas<-impute_lm(mcas,avgsalary~percap+regday)
+summary(mcas)
+```
+
+
+##### Question3: Using your assigned seed value, create a data partition. Assign approximately 60% of the records to your training set, and the other 40% to your validation set.
+```{r}
+set.seed(180)
+train<-sample_frac(mcas,0.6)
+valid<-setdiff(mcas,train)
+```
+
+
+##### Question4: Let’s explore the relationship between percap (per capita income among all people living in the school district) and totsc4 (total 4th grade score on MCAS, based on math, science, and English). Using ggplot, create a scatterplot that depicts totsc4 on the y-axis and percap on the x-axis. Add a best-fit line to this scatterplot. Use only your training set data to build this plot.What does this plot suggest about the relationship between these variables? Does this make intuitive sense to you? Why or why not?
+```{r}
+ggplot(train,aes(x=percap,y=totsc4))+geom_point()+ geom_smooth(method = "lm", se = FALSE)
+```
+####Variable totsc4 tends to increase as percap increases, the coefficient is positive. And the best-fit-line represents the correlation slopes upward between these two variables. 
+####This makes intuitive sense to me because firstly when I roughly look at the dataset, larger percap, higher totsc4. Secondly, as I look through the description of the dataset, percap represents per capita income and totsc4 represents 4th grade score (math+english+science). It makes sense that people with higher grades usually also perform well in work due to capability and personality.
+
+
+##### Question5: Now, again using training set data only, find the correlation between percap and totsc4. Then, use cor.test() to see whether this correlation is significant.What is this correlation? Is it a strong one? Is the correlation significant?
+```{r}
+cor(train$percap,train$totsc4)
+```
+
+```{r}
+cor.test(train$percap,train$totsc4)
+```
+
+####This is the Pearson's product-moment correlation. It is a measure of the strength of a linear association between two variables.  The p value of the test is 2.2e-16, which is less than the significance level alpha=0.05, we can conclude that percap and totsc4 is significant correlated with correlation of 0.655.
+
+
+
+
+##### Question6: Using your training set, create a simple linear regression model, with totsc4 as your outcome variable and percap as your input variable. Use the summary() function to display the results of your model.
+```{r}
+model1<-lm(train$totsc4 ~ train$percap)
+summary(model1)
+```
+
+##### Question7: What are the minimum and maximum residual values in this model?
+####The minimum residual value is -39.286   while the maximum residual value is 22.412
+
+
+##### 7-a:Find the district whose MCAS scores generated the highest residual value in your model. What was their actual average score? What did the model predict that it would be? How is the residual calculated from the two numbers that you just found?
+```{r}
+train$residual<-model1$residuals
+head(train[order(-train$residual),])
+#729
+```
+
+```{r}
+# based on the Intercept and train$percap's coefficient
+17.037*1.5636+679.9492
+```
+
+```{r}
+# based on the Intercept and train$percap's coefficient with residual error
+17.037*1.5636+679.9492+22.41203
+```
+
+####The district whose MCAS scores generated the highest residual value in my model is East Longmeadow.East Longmeadow 's actual average score is 729.0003. The model predicted that it would be 706.5883. Residual is exactly the difference between the actual average score and predicted average score.
+
+##### 7-b:Find the district whose MCAS scores generated the lowest residual value. What was the actual score? What did the model predict that it would be? How is the residual calculated from the two numbers that you just found?
+```{r }
+head(train[order(train$residual),])
+#658
+```
+
+```{r}
+# based on the Intercept and train$percap's coefficient
+11.088*1.5636+679.9492
+```
+
+```{r}
+# based on the Intercept and train$percap's coefficient with residual error
+11.088*1.5636+679.9492-39.28622
+```
+
+####The district whose MCAS scores generated the lowest residual value in my model is Holyoke. Holyoke 's actual average score is 658. The model predicted that it would be 697.2864. Residual is exactly the difference between the actual average score and predicted average score.
+
+
+##### 7-c:It might be unfair to say that the district in 7a overperformed, or that the district in 7b underperformed. Why might it be unfair to say this? (Note: You do *not* need to know about school districts or tests in order to answer this). However, you should look at the dataset and the data description, and give some thought to the limitations of SLR models, before answering). 
+
+####In simple linear regression even the best information cannot tell a complete story. Even if it is often used to examine the relationships that exist between variables, correlation is not the same as causation: a link between two variables does not mean that one variable causes the other to occur. We cannot directly say MCAS scores decides the the the amount of the income. The imcome may have other related factors such as that area's company size, average salaries and etc. 
+####Therefore, even a line in the simple linear regression that fits the information focus well may fail to ensure the relationship between context and logistical outcomes.That's why we need to use multiple linear regression for further analysis.
+
+
+##### Question8: What is the regression equation generated by your model? Make up a hypothetical input value and explain what it would predict as an outcome. To show the predicted outcome value, you can either use a function in R, or just explain what the predicted outcome would be, based on the regression equation and some simple math.
+
+```{r}
+# my model regression equation
+# y(totsc4)=10*1.5636+679.9492
+# assume that x(percam)=10
+10*1.5636+679.9492
+```
+####Assume that percam equals 10, my predicted outcome would be 695.5852 based on the equation.
+
+
+##### Question9: Using the accuracy() function from the forecast package, assess the accuracy of your model against both the training set and the validation set. What is the purpose of making this comparison? Focus on RMSE and MAE here in particular.
+```{r}
+# install.packages('forecast')
+library('forecast')
+pred1<-predict(model1,train)
+accuracy(pred1,train$totsc4)
+```
+
+```{r}
+model2<-lm(valid$totsc4~valid$percap)
+pred2<-predict(model2,valid)
+accuracy(pred2,valid$totsc4)
+```
+####RMSE is the square root of the average of squared differences between prediction and actual observation and MAE is the mean absolute error,measuring the average magnitude of the errors in a set of forecasts, without considering their direction. It measures accuracy for continuous variables. If the difference of RMSE and MAE between the model in training dataset and validation dataset is small, our model is assumed to be accurate. 
+####However, it is worth noting that the reason why the validation set RMSE is higher than the training set RMSE. Because to some extent I overfit the training set while the validation set contains data the model hasn’t seen before. Also the validation set has a smaller sample size than the training set and thus the mean error is lower. And based on the difference between RMSE in two sets, we can pay attention to the error on the training set.
+
+
+##### Question10: How does your model’s RMSE compare to the standard deviation of 4th grade test score averages in the training set? What can such a comparison teach us about the model?
+```{r}
+sd(train$totsc4)
+```
+####My model's RMSE is 11.28416 while standard deviation is 14.98616. Standard deviation uses the likely formula to measure how far off an actual value is from the model's prediction for that value. A good model usually on average has better predictions than the naïve estimate of the mean for all predictions. Thus, the measure of variation (RMSE) should reduce the randomness better than the SD.Thus, it makes sense that RMSE is lower than the sd.
+
+
+
+### Multiple linear regression
+##### Question1: Dealing with categorical data.For the factor variables that remain, determine their “uniqueness quotient.”Find this by taking the number of unique levels (values) for that factor, and dividing by the total number of records in the dataset. d. If a categorical variable has entirely unique values/levels, why will it not be useful for predictive purposes? 
+```{r}
+str(mcas)
+mcas$code<-as.factor(mcas$code)
+str(mcas)
+```
+
+```{r}
+nlevels(unique(mcas$code))/nlevels(mcas$code)
+nlevels(unique(mcas$municipa))/nlevels(mcas$municipa)
+nlevels(unique(mcas$district))/nlevels(mcas$district)
+```
+####The dataset right now has 3 factor variables. All the factor variables now are  “uniqueness quotient.” And I think if a categorical variable has entirely unique values, it is difficult to change to dummy variables to do regression since it has too many predictors. 
+
+
+
+##### Question2:Build a correlation table that includes all of the numeric variables in the training set. Are there any independent variable pairs that are very highly correlated with one Another (>|0.9|)? If there are, remove one member of each highly-correlated pair, and explain why you chose to remove it. If not, proceed to the next step.
+```{r}
+cor(train[4:17],use='complete.obs')
+```
+####As we can see, regday and totday are very highly correlated with one Another with 0.96. I will remove totday because the output of the model we built is totsc4, and the correlation between regday and totsc4 is 0.24, which is higher than the correlation between totday and totsc4 of 0.20.
+
+
+##### Question3:Using the backward elimination method shown in the book, build a multiple regression model with the data in your training set, with the goal of predicting the totsc4 variable. Start with all of the remaining numeric predictors in the dataset. a. Use the summary() function in R to demonstrate the MLR model that was recommended by the backward elimination process.
+```{r}
+MCAS1<-train[4:17]
+MCAS1<-MCAS1[-c(5)]
+model3<-lm(MCAS1$totsc4~.,data=MCAS1)
+summary(model3)
+```
+
+```{r}
+backward<-step(model3,direction='backward')
+```
+
+```{r}
+summary(backward)
+```
+
+
+##### Question4:Using the vif() function from the car package, determine the VIF for each of your model inputs.a. Are any VIF values higher than 5? If so, make a new version of your model that does not include any inputs with VIF > 5. b. Pick one of your inputs, and manually demonstrate where its VIF score comes from
+```{r}
+library('car')
+##spc causes the problem: there are aliased coefficients in the model
+model5<-lm(MCAS1$totsc4 ~ regday + specneed + bilingua + occupday  + speced + lnchpct + tchratio + percap + totsc8 + avgsalary + pctel,data=MCAS1)
+vif(model5)
+```
+####The input totsc8's ViF value is  higher than 5. 
+
+```{r}
+## drop spc and totsc8
+model6<-lm(MCAS1$totsc4 ~ regday + specneed + bilingua + occupday  + speced + lnchpct + tchratio + percap+ avgsalary + pctel,data=MCAS1)
+summary(model6)
+```
+
+```{r}
+library('car')
+##Pick one of your inputs as output
+avgsalary_vif<-lm(MCAS1$avgsalary ~ regday + specneed + bilingua + occupday  + speced + lnchpct + tchratio + percap + totsc8+ pctel,data=MCAS1)
+summary(avgsalary_vif)
+#1/(1-0.6026)
+```
+####In this model with 0.6026 R-squared. A high r-squared will lead to a high VIF. This model's vif is 2.52.
+
+
+##### Question5:What is the total sum of squares for your model? (SST). 
+```{r}
+ssr <- sum((fitted(backward) - mean(MCAS1$totsc4))^2)
+ssr
+```
+
+```{r}
+sse<-sum((fitted(backward)-MCAS1$totsc4)^2)
+sst<-sse+ssr
+sst
+```
+
+
+
+##### Question6:What is the total sum of squares due to regression for your model? (SSR). This can be found by summing all the squared differences between the fitted values and the mean for your outcome variable.
+```{r}
+ssr <- sum((fitted(backward) - mean(MCAS1$totsc4))^2)
+ssr
+```
+
+
+
+##### Question7:What is your SSR / SST? Where can you also see this value in the summary of your regression model?
+
+```{r}
+ssr/sst
+```
+
+```{r}
+#backward<-lm(formula = MCAS1$totsc4 ~ occupday + lnchpct + tchratio + totsc8 + pctel, data = MCAS1)
+summary(backward)
+```
+####Multiple R-squared is also roughly 0.7806212.
+
+
+##### Question8:Getting from a t-value to a p-value. Choose one of the predictors from your model. What is the t-value for that predictor? Using the visualize.t() function from the visualize package, create a plot of the t-distribution that shows the distribution for that t-value and the number of degrees of freedom in your model. What percent of the curve is shaded? How does this relate to the p-value for that predictor?
+
+```{r}
+library(visualize)
+visualize.t( stat =c(-2.812,2.812 ) , df=121, section = "bounded")
+```
+
+####The main difference between T-value and P-Value is that T-value is used to analyze the rate of difference between the means of the samples, while p-value is performed to gain proof that can be used to negate the indifference between the averages of two samples.
+####The curve shaded 95% of the model. As standard errors become smaller, relative to the coefficient value, that’s going to make the t-value bigger. A bigger t-value will occupy more space on the distribution shown above. Bigger t-value means smaller p-value. Lower p-value can be declared that the means have no difference; than in such a case, the tests and results of the entire test are considered to be inconsequential.
+
+
+##### Question9:What is your model’s F-Statistic? What does the F-Statistic measure? Using the formula shown in class, show how the F-Statistic for this model comes from TSS, RSS, n, and p.
+
+```{r}
+library(caret)
+options(scipen=999)
+#backward<-lm(formula = MCAS1$totsc4 ~ occupday + lnchpct + tchratio + totsc8 + pctel, data = MCAS1)
+#summary(backward)
+n<-132
+p<-5
+ssr<-sum((backward$fitted.values-mean(MCAS1$totsc4))^2)
+sse<-sum(backward$residuals^2)
+numerator<-ssr/p
+denominator<-sse/(n-p-1)
+numerator/denominator
+```
+####Formula : F= ((TSS-RSS)/p) / (RSS/(n-p-1)),My model's F-statistic is 89.66982. The F-statistic is simply a ratio of two variances. And variances are a measure of dispersion or how far the data are scattered from the mean. Larger values represent greater dispersion. Variance is the square of the sd.
+
+
+##### Question10:Make up a fictional school district. For each variable in the model, assign an in-range value to your district. What does your model predict that your district’s score will be? To answer this, you can use a function in R or just explain it using the equation and some simple math.
+
+####I created a fictional school district named 'Atlanda' with occupday (spending per pupil, occupational) of 100,lnchpct (eligible for free or reduced price lunch) of 50, tchratio (students per teacher) of 7.8, totsc8 of 300, pctel(percent English learners) of 200 in my model.
+```{r}
+summary(backward)
+414.0275666+0.0005054*100-0.2410839*50-0.6512537*7.8+0.4443800*300-0.5907743*200
+# my district Atlanda's score will be 412.1033
+
+```
+
+##### Question11:sing the accuracy() function from the forecast package, assess the accuracy of your model against both the training set and the validation set. What do you notice about these results – what do they mean? Describe your findings in a couple of sentences. In this section, you should also talk about the way your MLR model differed from your SLR model in terms of accuracy.
+
+```{r}
+pred1<-predict(backward)
+accuracy(pred1,MCAS1$totsc4)
+```
+
+```{r}
+pred1<-predict(backward)
+accuracy(pred1,valid$totsc4)
+```
+
+
+
+####SLR examines the relationship between the dependent variable and a single independent variable. MLR examines the relationship between the dependent variable and multiple independent variables.It ought to be that multiple regression is more accurate when the dependent variable to be studied depends upon more than one independent variable. With 6 RMSE in MLR while in SLR the RMSE is 11, which indicates that the accuracy in MLR is higher than in SLR because the lower RMSE, the better.
+#### The difference of RMSE is a little bit high between validation of set and the training set is probably the overfitting.It occurs when we “fit” a model too closely to the training data and we thus end up building a model that isn’t useful for making predictions about new data. But the validation set contains data the model hasn’t seen before. Also the validation set has a smaller sample size than the training set and thus the mean error is lower. And based on the difference between RMSE in two sets, we can pay attention to the error on the training set.The lower value of MAE and RMSE implies higher accuracy of a regression model, which shows that our created model(backward) is good. 
+
+
+

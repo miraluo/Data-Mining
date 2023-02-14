@@ -1,0 +1,321 @@
+---
+title: "HW5"
+author: "YAYUAN LUO"
+date: "4/26/2022"
+output: html_document
+---
+Task1:Hierarchical Clustering
+1. Read the dataset tiktok_top_1000.csv into R.
+2. What are your dataset’s dimensions?
+```{r }
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+tiktok<-read.csv('/Users/luoyayuan/Desktop/Class Slides/699/assignments/assignment5/tiktok_top_1000.csv')
+dim(tiktok)
+```
+
+My dataset has 1000 rows and 11 columns.
+
+
+3. Using any method in R for this purpose, randomly sample 25 rows from the entire group. Those are the rows that you’ll use for this clustering. You may set any seed value before sampling the data to get these 25 (I highly recommend using *some* seed value here, because otherwise you’ll get totally di
+```{r }
+set.seed(180)
+tiktok1<-sample_n(tiktok, 25)
+#View(tiktok1)
+```
+
+4. After reading the dataset description, take a look at your data, either with the head() function or the View() function. Should this data be scaled? Why or why not? If so, then scale your data’s numeric variables.
+```{r }
+tiktok.df.norm<-sapply(tiktok1[c(2,6,7,8,9,10)],scale)
+rownames(tiktok.df.norm) <- tiktok1[,4]
+head(tiktok.df.norm)
+```
+I should scale the data because hierarchical clustering needs to define the distance among variables.The measure computed is highly influenced by the scale of each variable, so variables with larger scales have a much greater influence over the total distance. Thus, it is better to scale the variables in case of receiving meaningless results.
+
+5. Build a hierarchical clustering model for the dataset, using any method for inter-cluster dissimilarity
+
+5.a. Create and display a dendrogram for your model.
+```{r }
+d<-dist(tiktok.df.norm,method='euclidean')
+#hc1<-hclust(d,method='single')
+#plot(hc1,hang=-1,ann=FALSE)
+#hc2<-hclust(d,method='average')
+#plot(hc2,hang=-1)
+hc3<-hclust(d,method='complete')
+plot(hc3,hang=-1)
+```
+5.b. By looking at your dendrogram, how many clusters do you see here? 
+
+Setting the cutoff distance to 3.7 on the complete linkage dendrogram results in 3 clusters. The 3 clusters are (from left to right on the dendrogram): {billie eilish},{anokhina liza,jules},{others}.
+
+
+5.c.Use the cutree function to cut the records into clusters. Specify your desired number of clusters, and show the resulting cluster assignments for each TikTok artist.
+```{r }
+memb<-cutree(hc3,k=3)
+memb
+```
+
+
+5.d.Attach the assigned cluster numbers back to the original dataset. Use groupby() and summarize() from dplyr to generate per-cluster summary stats, and write 2-3 sentences about what you find. What stands out here? What do you notice about any unusual variables or clusters?
+```{r }
+tiktok1$cluster<-memb
+tiktok2<-tiktok1%>% group_by(cluster)
+
+summarise(tiktok2,n = n(),Rank = mean(Rank),Subscribers.count = mean(Subscribers.count),Views.avg. = mean(Views.avg.),Likes.avg. = mean(Likes.avg.),Comments.avg. = mean(Comments.avg.),Shares.avg. = mean(Shares.avg.))
+summarise_if(tiktok2,is.numeric,sd)
+
+```
+Aftering grouping them by clusters, Cluster3 only contains 1 artist:billie eilish , so all the records are kept the same of herself. Because only 1 artist in this group, this cluster doesn't have standard deviation. 
+Cluster 2 contains 2 artists while cluster 1 contains the rest of them (22) artists.Thus, it makes sense that Cluster 1 has higher average values and lower standard deviation values than cluster 2 since a high standard deviation shows that the data is widely spread (less reliable) and a low standard deviation shows that the data are clustered closely around the mean (more reliable).
+
+
+5.e.Make any three simple visualizations to display the results of your clustering model. Be sure that the variables depicted in your visualizations are actual variables from your dataset.
+```{r }
+library(factoextra)
+library(ggplot2)
+library(dendextend)
+tiktok.df.norm1<-tiktok.df.norm
+rownames(tiktok.df.norm)<-paste(memb,':',rownames(tiktok.df.norm),sep='')
+heatmap(as.matrix(tiktok.df.norm),Colv=NA,hclustfun=hclust,col=rev(paste('grey',1:99,sep='')))
+```
+
+```{r }
+options(scipen = 999)  
+tiktok1$cluster<-as.factor(tiktok1$cluster)
+#ggplot(tiktok1,aes(cluster,Rank))+geom_point(size=2)+labs(x='clusters',y='rank position')+ggtitle("Comparison of artists' rank position")
+tiktok4<-filter(tiktok1,tiktok1$cluster==1)
+ggplot(tiktok4, aes(x = Subscribers.count, y = Title)) +
+  geom_point(size = 4) +
+  geom_segment(aes(xend = 0, yend =Title), size = 1)+labs(x='Total number of subscribers',y='artists')+ggtitle("Comparison of subscriber numbers among artists")
+```
+
+```{r }
+options(scipen = 999)  
+ggplot(tiktok1,aes(Views.avg.,Subscribers.count,color=cluster))+geom_point(size=1)+labs(x='Average Views',y='Total number of subscribers')+ggtitle("Relstionship between average views and subscriber numbers \n in Clusters")
+```
+
+
+5.f.Choose any TikTok artist from among your 25. What cluster did it fall into? Write 2-3 sentences about the other members of its cluster (or if it’s a singleton, write a bit about why it is a singleton).
+
+I chose artist '🥀 Виктория 🥀'. She falls into cluster 1. Comparing to other artists in cluster 1, Виктория has 209200 subscribers in tiktok, which has less total subscribers and the ranking position is in 865,which is relatively backward.However, as we can see the graph below, Виктория with less subscribers has the number of comments in the top three. I assume that her contents in tiktok must be interesting and she has potential ability gaining more fans in the future!
+
+```{r }
+ggplot(tiktok4, aes(x = Comments.avg., y = Title)) +
+  geom_point(size = 4) +
+  geom_segment(aes(xend = 0, yend =Title), size = 1)+labs(x='Total comments',y='artists')+ggtitle("Comparison of comments among artists")
+```
+
+6.In a previous step, you made the case for standardizing the variables. Now they’re all on equal footing... but why might it be problematic to view these variables with equal weight? 
+If we standardize all the variables,we cannot tell which variable has more significance to the outcome or dependent variable. For example, we know the total number of subscribers are the key factors to the popularity of artists. This variable is more important than those of comments,likes variables.
+
+
+7. Now it’s time to fix that problem! Come up with your own weighting system for these variables,and apply it here. Besurethat you are working with a dataframe(if the data is not a dataframe, you can quickly fix that with as.data.frame(). Multiply each column by the weight that you have assigned to it.
+Explain the weighting system in a short paragraph. There is no single *right* or *wrong* way to do this, but your answer to this question should demonstrate that you’ve taken some time to put some thought into it. One sentence per variable is enough to explain the weighting system.
+```{r }
+#install.packages('XQuartz.macosforge.org')
+tiktok.df.norm1<-as.data.frame(tiktok.df.norm1)
+weignted <-tiktok.df.norm1
+weignted$Rank<-weignted$Rank*0.5
+weignted$Subscribers.count<-weignted$Subscribers.count*2
+weignted$Views.avg.<-weignted$Views.avg.*1.5
+weignted$Likes.avg.<-weignted$Likes.avg.*1.2
+weignted$Comments.avg.<-weignted$Comments.avg.*0.8
+weignted$Shares.avg.<-weignted$Shares.avg.*1.2
+#View(weignted)
+```
+
+Total numbers of subscribers is the most important factor to the popularity of an artist because with more users following, this artist could get more advertisements and products endorsement. Thus I assign weight of 2X to the variable 'subscribers.count'.
+Variable 'Average views' is the second important factor to the popularity of an artist because artist needs to produce content that attract users and gives them emotionally beautiful experiences. Only in this way can they maintain user traffic. Thus I assign weight of 1.5X to the variable 'views.avg'.
+Variables 'Likes' and 'shares' are also important to artists. After viewing contents the artist has created, subscribers may take some actions like clicking like button or sharing with people surrounding them if they find the content is interesting, thus I assign weight of 1.2X to the variables likes and shares.
+Variable 'comments' is less important comparing to likes and shares because only leaving comments takes time to think what to leave. Just clicking the button is much easier for users to do. That's why we see more actions on viewing,liking and sharing numbers rather than leaving a comment. Thus I assign weight of 0.8X to the variable 'comments'.
+Variable 'Ranks' is less important comparing to other variables.It is the temporary weighing matrix for artists. With time passing by, the ranking may change. Some artists do a good job may rise while others may go down.Thus I assign weight of 0.5X to the variable 'rank'.
+
+
+8. Now, generate one more dendrogram, using your newly-rescaled set of variables (be sure that you’re not accidentally using the cluster assignments from a previous step as a clustering variable here).
+8.a.Once more, provide some description of what you see, and whether there are any noteworthy changes between this and the other dendrogram.
+```{r }
+d1<-dist(weignted,method='euclidean')
+#hc4<-hclust(d1,method='complete')
+#plot(hc4,hang=-1)
+hc5<-hclust(d1,method='average')
+plot(hc5,hang=-1)
+#hc6<-hclust(d1,method='single')
+#plot(hc6,hang=-1)
+# At last I chose average linkage method to draw the dendrogram
+```
+Setting the cutoff distance to 1.8 on the average linkage dendrogram results in 6 clusters. The 6 clusters are (from left to right on the dendrogram): {billie eilish},{anokhina liza},{user4350486101671,jules},{kbuloso,gui},{yuchun,Kenneth Kaas},{others}.
+
+
+8.b.Just as you did after the first hierarchical clustering, use the cutree() function to cut the records to clusters. Specify your desired number of clusters, and show the resulting cluster assignments for each state.
+```{r }
+memb1<-cutree(hc5,k=6)
+memb1
+```
+
+8.c.Attach the cluster assignments back to the original dataset. Use groupby() and summarize() from dplyr to generate per-cluster summary stats, and write 2-3 sentences about what you find.
+```{r }
+tiktok11<-tiktok1[,-12]
+tiktok11$cluster<-memb1
+tiktok22<-tiktok11%>% group_by(cluster)
+
+summarise(tiktok22,n = n(),Rank = mean(Rank),Subscribers.count = mean(Subscribers.count),Views.avg. = mean(Views.avg.),Likes.avg. = mean(Likes.avg.),Comments.avg. = mean(Comments.avg.),Shares.avg. = mean(Shares.avg.))
+```
+```{r }
+summarise_if(tiktok22,is.numeric,sd)
+```
+We can still say that with clusters that only has 1 record, the mean of every variable remains the same and they do not have standard deviation. Here we can compare with cluster 3,4,5 since they all have 2 records in it. Cluster 4 has the highest ranking position,views,likes,comments and shares but with least subscribers.Within cluster 4, some variables' sd are large showing that the data is widely spread. Artists in cluster 4 has some differences among variables such as 'likes' and 'views'. Since they are in the same cluster because of with less subscriber amount,their contents are pretty popular.The explanation for larger sd is that the base is large, the difference is relatively large comparing to others. And this cluster really deserves thinking!
+
+8.d.Show the same three types of visualizations that you made in a previous step, but with this model version, rather than the original one. What changes do you notice? (Pleasenote: theclusternumbersarearbitrary--toanswerthis,youneed to be willing to look into your data a bit to see what’s going on).
+```{r }
+weignted1<-weignted
+rownames(weignted1)<-paste(memb1,':',rownames(weignted1),sep='')
+heatmap(as.matrix(weignted1),Colv=NA,hclustfun=hclust,col=rev(paste('grey',1:99,sep='')))
+```
+```{r }
+tiktok11$cluster<-as.factor(tiktok11$cluster)
+#ggplot(tiktok1,aes(cluster,Rank))+geom_point(size=2)+labs(x='clusters',y='rank position')+ggtitle("Comparison of artists' rank position")
+tiktok5<-filter(tiktok11,tiktok11$cluster==1)
+ggplot(tiktok5, aes(x = Subscribers.count, y = Title)) +
+  geom_point(size = 4) +
+  geom_segment(aes(xend = 0, yend =Title), size = 1)+labs(x='Total number of subscribers',y='artists')+ggtitle("Comparison of subscriber numbers among artists")
+```
+
+
+```{r }
+options(scipen = 999)  
+ggplot(tiktok11,aes(Views.avg.,Subscribers.count,color=cluster))+geom_point(size=1)+labs(x='Average Views',y='Total number of subscribers')+ggtitle("Relstionship between average views and subscriber numbers \n in Clusters")
+```
+We can see that with newly-rescaled set of variables and cutrees, clusters are changing. So the relationship between average views and subscriber numbers have more dots grouped by clusters. Also comparison of subscriber numbers among artists has changed since cluster is more specific. Some artists belonging to certain cluster are removed from this cluster,thus we cannot see those artists in the graph.
+
+8.e.Let’s check back in on that TikTok star that you selected during a previous step. Where is that person now, with this new model? Who else is in the same cluster? In a few sentences, talk about what changed, and why, regarding this star’s cluster assignment.
+
+I chose artist '🥀 Виктория 🥀' previously.She is in still in cluster 1 that has most artists. Artists like Kayess is still in cluster1 .Виктория right now has larger subscribers and comments due to our weighting adjustment.Her comments in cluster 1 currently is in the top two. 
+
+```{r }
+ggplot(tiktok5, aes(x = Comments.avg., y = Title)) +
+  geom_point(size = 4) +
+  geom_segment(aes(xend = 0, yend =Title), size = 1)+labs(x='Total comments',y='artists')+ggtitle("Comparison of comments among artists")
+```
+
+Task2: Text Mining
+1.Load the gutenbergr package into your R environment. Bring the text whose number is the same as 2x your seed into your R environment (if no title in the Gutenberg library has a value that’s 2x your seed value, that’s okay -- you can just pick another title with a nearby value). If the book does not contain any words, the same thing applies -- just pick a title with a nearby number.
+```{r }
+library(gutenbergr)
+library(tidytext)
+#View(gutenberg_works())
+```
+
+2.Use the gutenberg_download() function to bring the text into your environment. Save your text as an object in your environment, using any variable name that you wish to call it.
+```{r }
+What_is_Property <- gutenberg_download(360)
+```
+
+3.Call the View() function on the object you created in the previous step. In a sentence, how would you describe what you see?
+```{r }
+#View(What_is_Property)
+```
+This book is separated by sentences in the cells and some cells have blank spaces with 16,218 rows.
+
+
+4.Now, let’s get this text into a tidy format. We can use the unnest_tokens() function to help us out with this.
+4.a.Run the unnest_tokens() function now, and be sure to reassign the results to a new object.
+```{r }
+What_is_Property1 <- What_is_Property %>% unnest_tokens(word, text)
+```
+
+4.b.View this object -- what do you see? Describe it in a sentence, and explain what changed from this step to what you saw in Step 2.
+```{r }
+#View(What_is_Property)
+```
+This book is separated by words right now in each cell rather than sentences with 155,264 rows.
+
+
+5.What were the 10 most frequently used words in your book? Show the code that you used to answer this question, along with your results.
+5.a.Now, use the anti_join() function to remove stopwords. Show the code that you used to do this. With the stopwords removed, what are the 10 most common wordsinyourtext? Showthemhere.
+```{r }
+top_words<-What_is_Property1%>% count(word, sort = TRUE)%>% top_n(10)
+top_words
+```
+
+```{r }
+What_is_Property2<-What_is_Property1%>% anti_join(stop_words)
+What_is_Property2%>%count(word,sort=TRUE)%>%top_n(10)
+```
+
+5.b.Do this again, but instead, do it with bigrams instead of unigrams.
+i. How are bigrams different from unigrams?
+ii. How might bigram analysis yield different results than unigram analysis?
+```{r }
+bigrams <-What_is_Property %>% unnest_tokens(bigram, text, token = "ngrams", n = 2)
+#View(bigrams)
+```
+A 1-gram (or unigram) is a one-word sequence while bigrams is a two-word sequence.This book isseparated by words but with 2 words in each cell with total 143,840 rows.
+
+
+5.c.Write 1-2 sentences that speculate about why it might be useful/interesting to see this list of the most frequently-used words from your text. What could someone do with it? Use your imagination and creativity to answer this.
+
+The result of separating bigrams is helpful for exploratory analyses of the text. For example, we might be interested in the most common “streets” such as beacon street, commonwealth avenue street and etc. If we only use unigrams the cell only contains part of the streets name like beacon,commonwealth. We cannot directly compare streets. That's why sometimes bigrams forms a phrase, making it easier to interpret and compare.
+
+
+6.Next, let’s do some sentiment analysis. We will use the bing lexicon for this purpose.
+a. What 10 words made the biggest sentiment contributions in your text? Show the code that you used to find this, along with your results.
+b. Of these top 10 words, how many were positive? How many were negative?
+c. In a sentence or two, speculate about what this list suggests about your text.
+```{r }
+#library(tidyr)
+#wip_sentiment<-What_is_Property%>%
+#  mutate(linenumber=row_number())%>%
+#  unnest_tokens(tokens,text)%>%
+#  inner_join(get_sentiments('bing'),by=c('tokens'='word'))%>%
+#  count(index=linenumber%/% 25,sentiment)%>%
+ # spread(sentiment,n,fill=0)%>%
+#  mutate(sentiment=positive-negative,fill=ifelse(sentiment>=0,'positive score','negative score'))
+#wip_sentiment
+
+library(janeaustenr)
+wip_sentiment <- What_is_Property1 %>% inner_join(get_sentiments("bing")) 
+
+wipcount <- wip_sentiment %>% count(word, sentiment, sort=TRUE)
+
+top_words <- wipcount%>% group_by(sentiment) %>% top_n(10) %>%
+  ungroup() %>% mutate(word = reorder(word, n))
+
+head(top_words,n=10)
+```
+
+Of the top 10 words, 8 are positive and 2 are negative. The book's whole name is 'What is Property? An Inquiry into the Principle of Right and of Government.'And from the top 10 words we can roughly guess that this book is talking about human right, human liberty and work. Sometimes the society exists inequality and impossibility that government helps to solve.If people use their talent well to solve problems, they may get rid of property.
+
+7. Create a barplot that shows both the 10 negative words and 10 positive words that contributed the most to the sentiment of your text.
+a. Use 2-3 sentences to describe what you see in your barplot.
+```{r }
+ggplot(top_words, aes(word, n, fill = sentiment)) + geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free") +  coord_flip() + ggtitle("Positive and Negative Sentiments in 'What_is_Property'")
+```
+From the barplot, I can see that the difference among negative words is lower than the positive words.  Except for the word "right", the rest of the words have less difference. The frequency of 'Right' has 624 times and the rest of them are less than 200. The frequency of negative words lie in the range of 25-163.
+
+8.Now let’s take a look at how a different sentiment lexicon would view your text. Bring the afinn lexicon into your environment, and join it with the text from your book. Show the step(s) you used to do this.
+a. Sum all the values for your text. What was the total?
+b. What does this suggest about your text? Why might this be helpful...but why might it also be incomplete or even misleading?
+```{r }
+#install.packages("textdata")
+#install.packages("stopwords")
+library(tidytext)
+library(tidyverse)
+What_is_Property1%>% count(word, sort = TRUE)
+wip <- What_is_Property1 %>% anti_join(stop_words)
+wip %>% count(word, sort = TRUE)
+wip2<- wip %>% inner_join(get_sentiments("afinn"))
+
+head(wip2)
+#wip_score <- What_is_Property %>% inner_join(get_sentiments("afinn"))
+#View(wip_score)
+#sum(wip_score$value)
+```
+```{r }
+sum(wip2$value) 
+```
+
+The total values for text is -256.This suggests that the whole book has more negative words because the value is negative. This shows the overall style of the article，whether it is illustrating the optimistic or pessimistic stories. 
+It might be incomplete or even misleading because the machine learns the algorithm and sometimes is not 100% correct. Words have lots of meanings and they are not like calculations that have only 1 correct answer. For example, we can say tough is negative. But when we describe a person's personality is tough, here tough is positive.
+

@@ -1,0 +1,296 @@
+---
+title: "AD699 assignment1"
+author: "YAYUAN LUO"
+date: "2/14/2022"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r}
+library(ggplot2)
+library(lubridate)
+library(tidyverse) 
+```
+##### Question1 and 2: Download and read the file
+```{r}
+Austin <- read.csv("/Users/luoyayuan/Desktop/Austin_311_Public_Data(1).csv")
+#View(Austin)
+str(Austin)
+```
+####  str() function shows the dataframe's rows,columns and its internal structure(ex:it is character or integers). My dataframe has 1203460 rows and 22 columns.
+
+##### Question3: filter the dataset that only includes assigned ZIP code
+```{r}
+Austin1 <-filter(Austin,Austin$Zip.Code==78617)
+dim(Austin1)
+```
+#### My dataframe has 13637 values with zip 78617. 
+
+#####  Question4: dealing with NA: 4-a: Are there any NA values in your dataframe? How do you know this? What is the total number of NAs in the dataframe?
+```{r}
+anyNA(Austin1)
+summary(Austin1)
+table(is.na(Austin1))
+#anyNA(Austin2)
+#summary(is.na(Austin2))
+```
+
+####  My dataframe has NA values. Using anyNA() function, I got 3393 NAs and these NAs are all in the column 'council district'. Because duration is created in my dataframe Austin2 ( Question 5-c ). When I use summary(Austin2) function, I can see that in close.date and duration columns both have 41 NAs. Duration is derived from the difference of created.date and close.date. How many NAs the close.date have, so does duration.
+
+
+###### 4-b: What percentage of the rows in the dataframe are complete cases? What is a complete case?
+```{r}
+library(scales)
+complete_cases<- Austin1[complete.cases(Austin1),]
+dim(complete_cases) 
+percent(10244/13637)
+```
+####  There are 75% complete cases in my dataframe. Complete.cases() function in R Language is used to return a logical vector with cases which are complete, i.e., no missing value.
+
+##### 4-c,d: convert blank cell into NAs, how many NAs are in the dataframe now?
+```{r}
+Austin1[Austin1 == " "] <- NA
+table(is.na(Austin1)) 
+```
+####  Right now there are still 3393 in the dataframe now.My dataframe do not have blank cell. 
+
+######  4-e: Now, what percentage of rows in the dataframe are complete cases? Why did your answer from 3b and 3e differ – what happened?
+```{r}
+complete_cases<- Austin1[complete.cases(Austin1),]
+dim(complete_cases) 
+percent(10244/13637)
+```
+#### In my dataframe complete cases still takes up 75%. It is the same in my dataframe because my dataframe do not have blank cell. 
+
+##### 4-f: Generate a table that shows the number of missing values and the percentage of missing values for each variable.
+```{r}
+table(is.na(Austin1)) 
+percent((13637-10244)/13637)
+```
+#### For the variable 'council district' the percentage of missing values is 25%.
+
+##### 4-g: remove any rows taht have NA values for the column City.
+```{r}
+Austin1$City<- as.factor(Austin1$City)   
+Austin2<-Austin1 %>% drop_na(City)
+Austin2<-as.data.frame(Austin2)
+table(is.na(Austin2$City))
+summary(Austin1$City)
+```
+#### There is no NA in my assigned zipcode for the column City.
+
+##### 4-h: How many rows of data do you have now?
+```{r}
+dim(Austin2)
+```
+#### I still have 13637 rows right now.
+
+
+
+
+##### 5-a: Run the str() function to see how R views the Created.Date and Close.Date variables. What data type are they?
+```{r}
+str(Austin2$Created.Date)
+str(Austin2$Close.Date)
+```
+#### character
+
+
+##### 5-b: Using any method, convert each of these two variables to a 'Date' data type, and show that their type has been successfully converted. explore the anydate() function from the anytime package).
+```{r}
+library(anytime)
+Austin2$Created.Date<-anydate(Austin2$Created.Date)
+Austin2$Close.Date<-anydate(Austin2$Close.Date)
+str(Austin2)
+```
+
+##### 5-c: Add duration to the df.
+```{r}
+Austin2$Duration<-(Austin2$Close.Date-Austin2$Created.Date)
+str(Austin2)
+
+# question 4-f (relationship between duration and closed date of NAs)
+anyNA(Austin2)
+summary(is.na(Austin2))
+```
+
+
+##### 5-d: what is your birthday? 
+```{r}
+library(lubridate)
+library(tibbletime)
+Austin2$Created.Date<-ymd(Austin2$Created.Date)
+Austin3<-mutate(Austin2, month = month(Austin2$Created.Date), day = day(Austin2$Created.Date))
+#View(Austin3)
+bdat<-Austin3%>%filter(month == "2" & day == "11")
+dim(Austin2)
+## Austin3<- Austin2 %>%filter(Created.Date == '02-11')
+# summary(Austin2$SR.Description)
+tail(sort(table(Austin3$SR.Description)))
+```
+
+### 6. Exploring the dataset
+##### 6-a: Should ZIP Code be considered a numeric or categorical variable? Why?
+```{r}
+Austin2$Zip.Code<-as.factor(Austin2$Zip.Code)
+str(Austin2)
+```
+#### ZIP Code should be considered a categorical variable. We usually use a two-part test to determine whether a variable is numeric. One is variable's values arae represented by numbers and the other is these numbers have meaningful mathematical properties. Even zip code satisfy the first condition, the sum of zip code is meaningless. We cannot say the address in 02134 plus the address in 02212 equals the place in 04346. 
+
+
+##### 6-b: What percentage of all the 311 city service requests in your dataframe came in through the Spot311 interface?
+```{r}
+count(Austin2,Austin2$Method.Received=='Spot311 Interface')
+```
+```{r}
+percent(1055/(12582+1055))
+```
+#### 8% of all the 311 city service requests in your dataframe came in through the Spot311 interface.
+
+##### 6-c: What percentage of all the 311 city service requests in your dataframe were made because of loose dogs?
+```{r}
+count(Austin2,Austin2$SR.Description=='Loose Dog')
+```
+```{r}
+percent(3434/(10203+3434))
+```
+#### 25% of all the 311 city service requests in your dataframe were made because of loose dog.
+
+##### 6-d: unique types of methods 
+```{r}
+count(Austin2,Austin2$Method.Received)
+```
+#### There are 12 unique types of methods that Austin receive service requests.
+
+
+##### 7: remove map.page column from the dataframe
+```{r}
+library(dplyr)
+Austin2<-select(Austin2,-c(Map.Page))
+dim(Austin2)
+```
+#### The previous dataframe has 23 columns and currently the Austin2 only has 22 columns without map.page.
+
+##### 8: Using the quarter() function from lubridate, create a new column called season. Season should be created from the Created.Date variable. Rename the quarters so that Quarter 1 becomes “Winter”, Quarter 2 becomes “Spring”, Quarter 3 becomes “Summer” and Quarter 4 becomes “Fall.”
+```{r}
+library(lubridate)
+season<-quarters(as.Date(Austin2$Created.Date))
+Austin2<-mutate(Austin2,Season=season)
+table(Austin2$Season)
+```
+
+```{r}
+#Austin3 <- Austin2
+class(Austin2$Season)
+Austin2$Season[Austin2$Season=='Q3']<-'Summer'
+Austin2$Season[Austin2$Season=='Q2']<-'Spring'
+Austin2$Season[Austin2$Season=='Q1']<-'Winter'
+Austin2$Season[Austin2$Season=='Q4']<-'Fall'
+table(Austin2$Season)
+```
+##### 9: construct a barplot showing the counts of city
+```{r}
+ggplot(data=Austin2,aes(x=Season))+geom_bar(fill=rainbow(n=4))
+```
+#### Requests in 4 seasons do not have a huge difference, which reflects that the influence factors of city service requests do not have a strong relationship with seasons.
+
+
+##### 10: Perform another filtering step. This time, filter your dataset so that only rows with the 6 most common SR.Description types remain. a. How many rows does your dataframe contain now? b. Using ggplot, make a barplot that depicts the counts for these six most common SR. Description types. Color your bars. Make sure that the axis labels are readable, and that the bars are ordered by size (this can be in increasing or decreasing order – either way is fine). c. In a sentence or two, describe your plot – what does it show?
+```{r}
+Most_Common<- as.data.frame(sort(table(Austin2$SR.Description)),decreasing=TRUE)
+names(Most_Common)[names(Most_Common) == 'Var1'] <- 'SR.Description'
+tail(Most_Common)
+```
+
+```{r}
+commontype_ofSR<- Austin2%>%filter(Austin2$SR.Description=='ARR Missed Recycling')
+commontype_ofSR1<-Austin2%>%filter(Austin2$SR.Description=='Street Light Issue- Address')
+commontype_ofSR2<-Austin2%>%filter(Austin2$SR.Description=='Injured / Sick Animal')
+commontype_ofSR3<- Austin2%>%filter(Austin2$SR.Description=='Animal Control - Assistance Request')
+commontype_ofSR4<-Austin2%>%filter(Austin2$SR.Description=='Austin Code - Request Code Officer')
+commontype_ofSR5<- Austin2%>%filter(Austin2$SR.Description=='Loose Dog')
+commontype_ofSR<-rbind(commontype_ofSR,commontype_ofSR1,commontype_ofSR2,commontype_ofSR3,commontype_ofSR4,
+                       commontype_ofSR5)
+dim(commontype_ofSR)
+
+```
+
+#### Now my dataframe contains 8781 rows.  
+
+```{r}
+commontype_ofSR %>% 
+	group_by(SR.Description) %>% 
+	summarise(count = n()) %>% 
+	ggplot(aes(x = reorder(SR.Description,(-count)), y = count)) + geom_bar(stat = 'identity') + theme(axis.text.x=element_text(angle=45, hjust=0.9))
+```
+#### This plot shows each service requests' quantities. 'Loose dog' request is the most common issues in the service request in my zip area.
+
+##### 11:filter the dataset so that only rows with the 6 most common types of Method.Received remain. Using facet_wrap to build faceted barplots. 
+```{r}
+Most_method<- as.data.frame(sort(table(commontype_ofSR$Method.Received)),decreasing=TRUE)
+names(Most_method)[names(Most_method) == 'Var1'] <- 'Method.Received'
+tail(Most_method)
+```
+```{r}
+Most_method0<- commontype_ofSR%>%filter(commontype_ofSR$Method.Received=='Other')
+Most_method1<- commontype_ofSR%>%filter(commontype_ofSR$Method.Received=='E-Mail')
+Most_method2<- commontype_ofSR%>%filter(commontype_ofSR$Method.Received=='Mobile Device')
+Most_method3<- commontype_ofSR%>%filter(commontype_ofSR$Method.Received=='Web')
+Most_method4<- commontype_ofSR%>%filter(commontype_ofSR$Method.Received=='Spot311 Interface')
+Most_method5<- commontype_ofSR%>%filter(commontype_ofSR$Method.Received=='Phone')
+Most_method<-rbind(Most_method0,Most_method1,Most_method2,Most_method3,Most_method4,Most_method5)
+dim(Most_method)
+```
+#### Currently my dataset has 8773 rows.
+
+```{r}
+
+ggplot(Most_method,aes(x=Method.Received))+geom_bar(fill='maroon3')+
+  facet_wrap(SR.Description ~.)
+```
+#### In the Faceted barplot, there are 6 kind of service requests. Each requests has 6 common solving methods. Faceted barplot splits the chart window in several small parts and display a similar chart in each section. Each section usually shows the same graph for a specific group of the dataset.The most common method is using phones, no matter what kind of service requests.
+
+
+##### 12: make a histogram that depicts the distribution of the duration variable
+```{r}
+ggplot(Austin2,aes(x=Austin2$Duration,bin=20))+geom_histogram(fill='yellowgreen')
+
+```
+
+##### 13: Filter the dataframe so that only the rows with the six most common streets remain.
+```{r}
+tail(sort(table(Austin2$Street.Name)))
+```
+
+```{r}
+Common_street <- filter(Most_method,Street.Name %in% c('ELROY','CARSON CREEK','SH 71','ROSS','PASEO NUEVO','GEMMER'))
+dim(Common_street)
+```
+```{r}
+ggplot(Common_street,aes(x=Street.Name,fill=SR.Description))+geom_bar(position='fill')
+```
+#### Proportional fill barplot shows that the length or height of each bar is proportionally equivalent to the data. One axis of the graph details specific data categories while the other axis highlights the measured value for comparison. The first one is in Paseo nuevo,austin code-request code officer takes a large proportion of the total count. The second one is losing dog is commonly happening in the rest of the five streets. Since lots of homes are feeding dogs, thus these kind of problems happens a lot than others.  
+
+
+##### 14: Run the following line of code. Instead of saying “dataframe”, use the name of your dataframe. Replace the question marks with a reference to the dataframe, plus the columns that contain longitude and latitude.
+```{r}
+library(leaflet)
+mAustin<-leaflet()%>% addTiles()%>%addCircles(lng=Austin2$Longitude.Coordinate,lat=Austin2$Latitude.Coordinate)
+mAustin #print the map
+```
+
+
+
+##### 15:Run something similar, but this time, select something of your choice after the dollar Sign. If you’re not sure what to choose, try a few things out and explore to find out what they do!
+```{r}
+mAustin<-leaflet()%>%addTiles%>%addCircles(lng=Austin2$Longitude.Coordinate,lat=Austin2$Latitude.Coordinate)%>%addProviderTiles(providers$Esri.WorldImagery)
+mAustin #print the map
+```
+
+
+
+
+
+
